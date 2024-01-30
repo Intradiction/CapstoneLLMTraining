@@ -1,11 +1,18 @@
 import gradio as gr
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer
+from peft import AutoPeftModelForSequenceClassification
 
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+loraModel = AutoPeftModelForSequenceClassification.from_pretrained("Intradiction/text_classification_WithLORA")
 # Handle calls to DistilBERT no LORA
 distilBERTnoLORA_pipe = pipeline(model="Intradiction/text_classification_NoLORA")
+distilBERTwithLORA_pipe = pipeline("sentiment-analysis", model=loraModel, tokenizer=tokenizer)
 
 def distilBERTnoLORA_fn(text):
     return distilBERTnoLORA_pipe(text)
+
+def distilBERTwithLORA_fn(text):
+    return distilBERTwithLORA_pipe(text)
 
 def chat1(message,history):
     history = history or []
@@ -62,14 +69,14 @@ with gr.Blocks(
 
             with gr.Column():
                 with gr.Row(variant="panel"):
-                    out =  gr.Textbox(label= " Untrained Model")
+                    out =  gr.Textbox(label= " DistilBERT no LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
                                 </div>""")
 
                 with gr.Row(variant="panel"):
-                    out1 = gr.Textbox(label= " Conventionaly Fine Tuned Model")
+                    out1 = gr.Textbox(label= " DistilBERT with LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
@@ -83,7 +90,7 @@ with gr.Blocks(
                                 </div>""")
 
         btn.click(fn=distilBERTnoLORA_fn, inputs=inp, outputs=out)
-        btn.click(fn=chat1, inputs=inp, outputs=out1)
+        btn.click(fn=distilBERTwithLORA_fn, inputs=inp, outputs=out1)
         btn.click(fn=chat1, inputs=inp, outputs=out2)
 
     with gr.Tab("Natrual Language Infrencing"):
@@ -113,14 +120,14 @@ with gr.Blocks(
 
             with gr.Column():
                 with gr.Row(variant="panel"):
-                    out =  gr.Textbox(label= " Untrained Model")
+                    out =  gr.Textbox(label= " DistilBERT no LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
                                 </div>""")
 
                 with gr.Row(variant="panel"):
-                    out1 = gr.Textbox(label= " Conventionaly Fine Tuned Model")
+                    out1 = gr.Textbox(label= " DistilBERT with LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
@@ -160,14 +167,14 @@ with gr.Blocks(
 
             with gr.Column():
                 with gr.Row(variant="panel"):
-                    out =  gr.Textbox(label= " Untrained Model")
+                    out =  gr.Textbox(label= " DistilBERT no LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
                                 </div>""")
 
                 with gr.Row(variant="panel"):
-                    out1 = gr.Textbox(label= " Conventionaly Fine Tuned Model")
+                    out1 = gr.Textbox(label= " DistilBERT with LoRA")
                     gr.Markdown("""<div>
                                 <span><center><B>Training Information</B><center></span>
                                 <span><br><br><br><br><br></span>
