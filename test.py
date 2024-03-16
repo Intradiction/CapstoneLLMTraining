@@ -1,6 +1,12 @@
-import platform
-print('Platform processor:', platform.processor())
-print('Platform architecture:',platform.architecture())
+from transformers import pipeline, AutoTokenizer, BertForSequenceClassification
+from peft import PeftModel
 
-# run below command on cmd to create venv with specified python version
-# py -3.10 -m venv my_venv
+base_model = BertForSequenceClassification.from_pretrained("bert-base-uncased")
+peft_model_id = "Intradiction/BERT-SA-LORA"
+model = PeftModel.from_pretrained(model=base_model, model_id=peft_model_id)
+merged_model = model.merge_and_unload()
+
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+lorapipe = pipeline("sentiment-analysis", model=merged_model, tokenizer=tokenizer)
+print(lorapipe('This movie is terrible'))

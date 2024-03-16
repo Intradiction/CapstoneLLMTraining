@@ -1,19 +1,24 @@
 import gradio as gr
-from transformers import pipeline, AutoTokenizer
+from transformers import pipeline, AutoTokenizer, AutoModel
 from peft.auto import AutoPeftModelForSequenceClassification
-
-tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-loraModel = AutoPeftModelForSequenceClassification.from_pretrained("Intradiction/text_classification_WithLORA")
+from tensorboard.backend.event_processing import event_accumulator
+from peft import PeftModel
+import plotly.express as px
+import pandas as pd
 
 tokenizer1 = AutoTokenizer.from_pretrained("albert-base-v2")
 
+loraModel = AutoPeftModelForSequenceClassification.from_pretrained("Intradiction/text_classification_WithLORA")
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+
+tokenizer2 = AutoTokenizer.from_pretrained("microsoft/deberta-v3-xsmall")
+base_model = AutoModel.from_pretrained("microsoft/deberta-v3-xsmall")
+peft_model_id = "rajevan123/STS-Lora-Fine-Tuning-Capstone-Deberta-small"
+model = PeftModel.from_pretrained(base_model, peft_model_id)
+#merged_model = model.merge_and_unload()
 
 
-#pretrained models
-#STSmodel_pipe = pipeline()
-#NLImodel_pipe = pipeline()
-
-# Handle calls to DistilBERT 
+# Handle calls to DistilBERT------------------------------------------
 distilBERTUntrained_pipe = pipeline("sentiment-analysis", model="bert-base-uncased")
 distilBERTnoLORA_pipe = pipeline(model="Intradiction/text_classification_NoLORA")
 distilBERTwithLORA_pipe = pipeline("sentiment-analysis", model=loraModel, tokenizer=tokenizer)
@@ -29,7 +34,7 @@ def distilBERTUntrained_fn(text):
     return distilBERTUntrained_pipe(text)
 
 
-# Handle calls to ALBERT
+# Handle calls to ALBERT---------------------------------------------
 ALbertUntrained_pipe = pipeline("text-classification", model="albert-base-v2")
 AlbertnoLORA_pipe = pipeline(model="Intradiction/NLI-Conventional-Fine-Tuning")
 #AlbertwithLORA_pipe = pipeline()
@@ -45,33 +50,95 @@ def AlbertUntrained_fn(text1, text2):
     return ALbertUntrained_pipe({'text': text1, 'text_pair': text2})
 
 
-# Handle calls to Deberta
+# Handle calls to Deberta--------------------------------------------
 DebertaUntrained_pipe = pipeline("text-classification", model="microsoft/deberta-v3-xsmall")
-#DebertanoLORA_pipe = pipeline()
-#DebertawithLORA_pipe = pipeline()
+DebertanoLORA_pipe = pipeline("text-classification", model="rajevan123/STS-Conventional-Fine-Tuning")
+DebertawithLORA_pipe = pipeline("text-classification", model=model, tokenizer=tokenizer2)
 
 #STS models
 def DebertanoLORA_fn(text1, text2):
-    return ("working3")
+    return DebertanoLORA_pipe({'text': text1, 'text_pair': text2})
 
 def DebertawithLORA_fn(text1, text2):
-    return ("working2")
+    return DebertawithLORA_pipe({'text': text1, 'text_pair': text2})
+    #return ("working2")
 
 def DebertaUntrained_fn(text1, text2):
     return DebertaUntrained_pipe({'text': text1, 'text_pair': text2})
 
+#helper functions ------------------------------------------------------
 
-#placeholder
-def chat1(message,history):
-    history = history or []
-    message = message.lower()
-    if message.startswith("how many"):
-        response = ("1 to 10")
-    else:
-        response = ("whatever man whatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever man")
+#Text metrics for Untrained models
+def displayMetricStatsUntrained():
+    return "No statistics to display for untrained models"
 
-    history.append((message, response))
-    return history, history
+def displayMetricStatsText():
+    file_name = 'events.out.tfevents.1701212945.784ae33ab242.985.0'
+    event_acc = event_accumulator.EventAccumulator(file_name,
+    size_guidance={
+    event_accumulator.COMPRESSED_HISTOGRAMS: 500,
+    event_accumulator.IMAGES: 4,
+    event_accumulator.AUDIO: 4,
+    event_accumulator.SCALARS: 0,
+    event_accumulator.HISTOGRAMS: 1,
+})
+   
+    event_acc.Reload()
+    accuracy_data = event_acc.Scalars('eval/accuracy')
+    loss_data = event_acc.Scalars('eval/loss')
+    metrics = ''
+    for i in range(0, len(loss_data)):
+        metrics = metrics + 'Epoch Number: ' + str(i) + '\n'
+        metrics = metrics + 'Accuracy (%): ' + str(round(accuracy_data[i].value * 100, 3)) + '\n'
+        metrics = metrics + 'Loss (%): ' + str(round(loss_data[i].value * 100, 3)) + '\n\n'
+    
+    return metrics
+
+def displayMetricStatsGraph():
+   file_name = 'events.out.tfevents.1701212945.784ae33ab242.985.0'
+   event_acc = event_accumulator.EventAccumulator(file_name,
+   size_guidance={
+    event_accumulator.COMPRESSED_HISTOGRAMS: 500,
+    event_accumulator.IMAGES: 4,
+    event_accumulator.AUDIO: 4,
+    event_accumulator.SCALARS: 0,
+    event_accumulator.HISTOGRAMS: 1,
+})
+   
+   event_acc.Reload()
+   accuracy_data = event_acc.Scalars('eval/accuracy')
+   loss_data = event_acc.Scalars("eval/loss")
+   epoch = []
+   metric = []
+   group = []
+   for i in range(0, len(accuracy_data)):
+       epoch.append(str(i))
+       metric.append(accuracy_data[i].value)
+       group.append('G1')
+   for j in range(0, len(loss_data)):
+       epoch.append(str(j))
+       metric.append(loss_data[j].value)
+       group.append('G2')
+   data = pd.DataFrame()
+   data['Epoch'] = epoch
+   data['Metric'] = metric
+   data['Group'] = group
+
+  #generate the actual plot
+   return px.line(data, x = 'Epoch', y = 'Metric', color=group, markers = True)
+
+
+# #placeholder
+# def chat1(message,history):
+#     history = history or []
+#     message = message.lower()
+#     if message.startswith("how many"):
+#         response = ("1 to 10")
+#     else:
+#         response = ("whatever man whatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever manwhatever man")
+
+#     history.append((message, response))
+#     return history, history
 
 
 with gr.Blocks(
@@ -81,7 +148,7 @@ with gr.Blocks(
     gr.Markdown("""
         <div style="overflow: hidden;color:#fff;display: flex;flex-direction: column;align-items: center; position: relative; width: 100%; height: 180px;background-size: cover; background-image: url(https://www.grssigns.co.uk/wp-content/uploads/web-Header-Background.jpg);">
             <img style="width: 130px;height: 60px;position: absolute;top:10px;left:10px" src="https://www.torontomu.ca/content/dam/tmumobile/images/TMU-Mobile-AppIcon.png"/>
-            <span style="margin-top: 40px;font-size: 36px ;font-family:fantasy;">Efficient Fine Tuning Offf Large Language Models</span>
+            <span style="margin-top: 40px;font-size: 36px ;font-family:fantasy;">Efficient Fine Tuning Of Large Language Models</span>
             <span style="margin-top: 10px;font-size: 14px;">By: Rahul Adams, Greylyn Gao, Rajevan Logarajah & Mahir Faisal</span>
             <span style="margin-top: 5px;font-size: 14px;">Group Id: AR06 FLC: Alice Reuda</span>
         </div>
@@ -102,6 +169,8 @@ with gr.Blocks(
             with gr.Column(variant="panel"):
                 inp = gr.Textbox(placeholder="Prompt",label= "Enter Query")
                 btn = gr.Button("Run")
+                btnTextClassStats = gr.Button("Display Training Metrics")
+                btnTensorLink = gr.Button(value="View Tensorboard Graphs", link="https://huggingface.co/Intradiction/text_classification_NoLORA/tensorboard")
                 gr.Examples(
                     [
                         "I thought this was a bit contrived",
@@ -115,29 +184,22 @@ with gr.Blocks(
             with gr.Column(scale=3):
                 with gr.Row(variant="panel"):
                     TextClassOut =  gr.Textbox(label= "Untrained Base Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    TextClassUntrained = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     TextClassOut1 = gr.Textbox(label= "Conventionaly Trained Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    TextClassNoLoraStats = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     TextClassOut2 = gr.Textbox(label= "LoRA Fine Tuned Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    TextClassLoraStats = gr.Textbox(label = "Training Informaiton")
 
         btn.click(fn=distilBERTUntrained_fn, inputs=inp, outputs=TextClassOut)
         btn.click(fn=distilBERTnoLORA_fn, inputs=inp, outputs=TextClassOut1)
         btn.click(fn=distilBERTwithLORA_fn, inputs=inp, outputs=TextClassOut2)
-        
+        btnTextClassStats.click(fn=displayMetricStatsUntrained, outputs=TextClassUntrained)
+        btnTextClassStats.click(fn=displayMetricStatsText, outputs=TextClassNoLoraStats)
+        btnTextClassStats.click(fn=DebertawithLORA_fn, outputs=TextClassLoraStats) #to be changed
 
     with gr.Tab("Natural Language Inferencing"):
          with gr.Row():
@@ -155,6 +217,8 @@ with gr.Blocks(
                 nli_p1 = gr.Textbox(placeholder="Prompt One",label= "Enter Query")
                 nli_p2 = gr.Textbox(placeholder="Prompt Two",label= "Enter Query")
                 nli_btn = gr.Button("Run")
+                btnNLIStats = gr.Button("Display Training Metrics")
+                btnTensorLink1 = gr.Button(value="View Tensorboard Graphs", link="https://huggingface.co/Intradiction/text_classification_NoLORA/tensorboard") #to be changed
                 gr.Examples(
                     [
                         "I am with my friends",
@@ -177,28 +241,23 @@ with gr.Blocks(
             with gr.Column(scale=3):
                 with gr.Row(variant="panel"):
                     NLIOut =  gr.Textbox(label= "Untrained Base Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    NLIUntrained = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     NLIOut1 = gr.Textbox(label= "Conventionaly Trained Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    NLINoLoraStats = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     NLIOut2 = gr.Textbox(label= "LoRA Fine Tuned Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    NLILoraStats = gr.Textbox(label = "Training Informaiton")
         
          nli_btn.click(fn=AlbertUntrained_fn, inputs=[nli_p1,nli_p2], outputs=NLIOut)
          nli_btn.click(fn=AlbertnoLORA_fn, inputs=[nli_p1,nli_p2], outputs=NLIOut1)
          nli_btn.click(fn=AlbertwithLORA_fn, inputs=[nli_p1,nli_p2], outputs=NLIOut2)
+         btnNLIStats.click(fn=displayMetricStatsUntrained, outputs=NLIUntrained)
+        #btnNLIStats.click(fn=displayMetricStatsUntrained, outputs=NLINoLoraStats)
+        #btnNLIStats.click(fn=displayMetricStatsUntrained, outputs=NLILoraStats)
+         
 
     with gr.Tab("Semantic Text Similarity"):
          with gr.Row():
@@ -216,6 +275,8 @@ with gr.Blocks(
                 sts_p1 = gr.Textbox(placeholder="Prompt One",label= "Enter Query")
                 sts_p2 = gr.Textbox(placeholder="Prompt Two",label= "Enter Query")
                 sts_btn = gr.Button("Run")
+                btnSTSStats = gr.Button("Display Training Metrics")
+                btnTensorLink2 = gr.Button(value="View Tensorboard Graphs", link="https://huggingface.co/Intradiction/text_classification_NoLORA/tensorboard") #to be changed
                 gr.Examples(
                     [
                         "the ball is green",
@@ -238,30 +299,24 @@ with gr.Blocks(
             with gr.Column(scale=3):
                 with gr.Row(variant="panel"):
                     sts_out =  gr.Textbox(label= "Untrained Base Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    STSUntrained = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     sts_out1 = gr.Textbox(label= "Conventionally Trained Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Information</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    STSNoLoraStats = gr.Textbox(label = "Training Informaiton")
 
                 with gr.Row(variant="panel"):
                     sts_out2 = gr.Textbox(label= "LoRA Fine Tuned Model")
-                    gr.Markdown("""<div>
-                                <span><center><B>Training Informadtion</B><center></span>
-                                <span><br><br><br><br><br></span>
-                                </div>""")
+                    STSLoraStats = gr.Textbox(label = "Training Informaiton")
                     
          sts_btn.click(fn=DebertaUntrained_fn, inputs=[sts_p1,sts_p2], outputs=sts_out)
          sts_btn.click(fn=DebertanoLORA_fn, inputs=[sts_p1,sts_p2], outputs=sts_out1)
          sts_btn.click(fn=DebertawithLORA_fn, inputs=[sts_p1,sts_p2], outputs=sts_out2)
+         btnSTSStats.click(fn=displayMetricStatsUntrained, outputs=STSUntrained)
+         #btnSTSStats.click(fn=displayMetricStatsUntrained, outputs=STSNoLoraStats)
+         #btnSTSStats.click(fn=displayMetricStatsUntrained, outputs=STSLoraStats)
 
-    with gr.Tab("More information"):
+    with gr.Tab("More informatioen"):
         gr.Markdown("stuff to add")
 
 
