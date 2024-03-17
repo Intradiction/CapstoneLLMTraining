@@ -9,4 +9,4 @@ merged_model = model.merge_and_unload()
 tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
 lorapipe = pipeline("sentiment-analysis", model=merged_model, tokenizer=tokenizer)
-print(lorapipe('This movie is terrible'))
+print(lorapipe('This movie is awesome'))
